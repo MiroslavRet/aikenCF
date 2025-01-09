@@ -10,6 +10,11 @@ validator campaign(
   nonce: OutputReference,
 ) {
   mint(
+    /// Create a new redeemer type to support multiple actions,
+    /// eg:
+    /// - `InitCampaign`(`CampaignDatum`)
+    /// - `SupportCampaign`
+    /// - `FinishCampaign` (to burn support tokens and mint prize/reward tokens)
     redeemer campaign_datum: CampaignDatum,
     policy_id self_script: PolicyId,
     tx: Transaction,

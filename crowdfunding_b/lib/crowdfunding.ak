@@ -3,7 +3,6 @@ use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{Lovelace, PolicyId}
-use crowdfunding/utils.{address_from_tuple}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
@@ -12,8 +11,8 @@ use crowdfunding/types.{
   BackerDatum, CampaignAction, CampaignDatum, Cancel, Cancelled, Finish,
   Finished, Refund, Running,
 }
-use crowdfunding/utils
-use time_util/unsafe/bound as unsafe_unwrap
+use crowdfunding/utils.{address_from_tuple}
+use test_kit/time/unwrap
 
 /// Validates the following action:
 /// - Create campaign
@@ -25,6 +24,12 @@ pub fn validate_mint_campaign(
   self_script: PolicyId,
   tx: Transaction,
 ) -> Bool {
+  // Handle the new redeemer-type like,
+  // when redeemer is {
+  //   InitCampaign(campaign_datum) -> ..validate_create_campaign(campaign_datum)
+  //   SupportCampaign { .. } -> validate support campaign( .. )
+  //   FinishCampaign -> burn the support token and mint a prize/reward token etc.
+  // }
   tx |> validate_create_campaign(self_script, campaign_datum, nonce, creator)
 }
 
@@ -38,6 +43,8 @@ pub fn validate_spend_campaign(
   creator _creator: VerificationKeyHash,
   nonce _nonce: OutputReference,
   datum: Option<Data>,
+  /// Add a new action-constructor similar to `RefundCampaign` but for distributing the values to the campaign creator instead!
+  /// Review what was discussed during the QnA
   campaign_action: CampaignAction,
   o_ref: OutputReference,
   tx: Transaction,
@@ -88,7 +95,7 @@ fn validate_create_campaign(
     campaign_datum
   expect creator == pkh
   expect goal > 0
-  expect unsafe_unwrap.finite_start_of(tx.validity_range) < deadline
+  expect unwrap.finite_start_of(tx.validity_range) < deadline
   and {
     must_consume_creator_nonce(tx, creator, nonce)?,
     must_mint_state_token(tx, self_script)?,
@@ -119,6 +126,14 @@ fn validate_cancel_campaign(
   }
 }
 
+/// Modify the behavior of finish campaign validation to **read-from** backer/support UTxOs
+/// needed to satisfy the goal (value sum must be >= campaign goal)
+/// and then the campaign state must be updated to `Finished`
+///
+/// Handle prize/reward tokens minting in another action when sending the backer support value
+/// to the campaign creator (this is the new type of action, not defined yet in this version)
+///
+/// Review back what was discussed, it is also brought up during Dec 1st session.
 pub fn validate_finish_campaign(
   tx: Transaction,
   self_script: PolicyId,
@@ -139,17 +154,14 @@ pub fn validate_finish_campaign(
         let (creator_pkh, _creator_skh) = campaign_datum.creator
         must_be_signed_by(tx, creator_pkh)?
       },
-
       // 2. The campaign UTxO must be running
       is_running_campaign(tx.inputs, self_script)?,
-
       // 3. Move the STATE_TOKEN to the same script address with the new Finished datum
       must_send_state_token(
         tx,
         self_script,
-        with_datum: CampaignDatum {..campaign_datum, state: Finished},
+        with_datum: CampaignDatum { ..campaign_datum, state: Finished },
       )?,
-
       // 4. Must reach goal, send remaining lovelace to the creator
       must_reach_goal_and_send_to_creator(
         tx,
@@ -157,7 +169,6 @@ pub fn validate_finish_campaign(
         campaign_datum.goal,
         campaign_datum.creator,
       )?,
-
       // 5. Mint prize tokens for each backer input
       {
         let is_backer_datum =
@@ -192,7 +203,6 @@ pub fn validate_finish_campaign(
         must_mint_prize_tokens(tx, backer_inputs, self_script)?
       },
     }
-
   } else if current_datum is BackerDatum {
     // If the current datum is a BackerDatum, we only check that
     // the campaign UTxO is still in the Running state
@@ -234,7 +244,7 @@ fn must_be_signed_by(tx: Transaction, signer: VerificationKeyHash) -> Bool {
 
 fn must_be_after_deadline(tx: Transaction, deadline: Int) -> Bool {
   // tx validFrom is after or at deadline
-  (unsafe_unwrap.finite_start_of(tx.validity_range) >= deadline)?
+  (unwrap.finite_start_of(tx.validity_range) >= deadline)?
 }
 
 fn must_reach_goal_and_send_to_creator(
