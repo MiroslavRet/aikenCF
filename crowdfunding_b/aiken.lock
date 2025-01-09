@@ -7,13 +7,13 @@ version = "2.2.0"
 source = "github"
 
 [[requirements]]
-name = "aiken-extra/time_util"
-version = "5.220.202412"
+name = "aiken-lang/fuzz"
+version = "2.1.0"
 source = "github"
 
 [[requirements]]
-name = "aiken-extra/tx_util"
-version = "2.220.202412"
+name = "aiken-extra/test_kit"
+version = "hydrogen"
 source = "github"
 
 [[packages]]
@@ -23,15 +23,16 @@ requirements = []
 source = "github"
 
 [[packages]]
-name = "aiken-extra/time_util"
-version = "5.220.202412"
+name = "aiken-lang/fuzz"
+version = "2.1.0"
 requirements = []
 source = "github"
 
 [[packages]]
-name = "aiken-extra/tx_util"
-version = "2.220.202412"
+name = "aiken-extra/test_kit"
+version = "hydrogen"
 requirements = []
 source = "github"
 
 [etags]
+"aiken-extra/test_kit@hydrogen" = [{ secs_since_epoch = 1736405856, nanos_since_epoch = 363974766 }, "33e017a71dbbd1094aee79842bd48e4b9396a9e1e6811d42a42ffd376853e282"]
